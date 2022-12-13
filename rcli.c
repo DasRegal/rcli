@@ -5,25 +5,63 @@
 #include "buf.h"
 
 #define BUF_MAX 128
+
 static unsigned char buf[BUF_MAX];
+static unsigned char rcli_out_buf[BUF_MAX];
 
-ctrlBuf_s bufStruct;
+static ctrlBuf_s bufStruct;
 
-void HandleSymbol(char ch)
+#define RCLI_PROMPT_STR   "> "
+#define RCLI_PROMPT_SHIFT 2    /* strlen of RCLI_PROMPT_STR */
+
+unsigned char RcliTransferChar(const char ch)
 {
-
+    printf("%c", ch);
+    return 0;
 }
 
-void IntUart()
+void RcliReceiveChar(char ch)
 {
-    char ch;
-    ch = getc(stdin);
-    HandleSymbol(ch);
+}
+
+static unsigned char RcliTransferStr(unsigned char * const pBuf, unsigned char len)
+{
+    unsigned char *buf = pBuf;
+
+    if (len > BUF_MAX)
+    {
+        len = BUF_MAX;
+    }
+
+    if (buf == NULL)
+    {
+        return 1;
+    }
+
+    while(len--)
+    {
+        if (RcliTransferChar(*buf++) != 0)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+void RcliInit(void)
+{
+    BufInit(&bufStruct, buf, BUF_MAX);
+    sprintf(rcli_out_buf, "Welcome (RCli)\n");
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+    
+    sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
 }
 
 int main(void)
 {
-    BufInit(&bufStruct, buf, BUF_MAX);
+    RcliInit();
 
     BufAdd(&bufStruct, 'a', 0);
     BufAdd(&bufStruct, 'b', 0);
@@ -67,25 +105,27 @@ int main(void)
     //     // HandleSymbol(ch);
     // }
 
-/*    char ch;
-    ch = 65;
-    func(&ch);
-    system ("/bin/stty raw");
+    char ch;
+//    ch = 65;
+//    func(&ch);
+//    system ("/bin/stty raw");
     while(1)
     {
         ch = getc(stdin);
         if (ch == '\033')
         {
+            printf("here 0\n");
             if (!getc(stdin))
                 break;
             if (getc(stdin) == 'D')
-                printf("\e[%dD\e[K", 5);
+            {
+                printf("\e[%dA\e[K", 2);
+            }
             else
                 printf("\e[%dD\e[K", 4);
         }
         else
             printf("\e[%dD%c", 1, ch);
     }
-*/
     return 0;
 }

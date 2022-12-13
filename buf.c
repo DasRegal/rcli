@@ -196,7 +196,7 @@ void BufDebug(ctrlBuf_s bufStruct)
     printf("\t cur_pos: %d\n", bufStruct.cur_pos);
     printf("\t end: %d\n", bufStruct.end);
     printf("\t is_clear: %d\n", bufStruct.is_clear);
-    printf("\t pBuf: %d\n", bufStruct.pBuf);
+    printf("\t pBuf: %p\n", bufStruct.pBuf);
     printf("\t max_size: %d\n", bufStruct.max_size);
     printf("\t buf=\"%s\"\n", bufStruct.pBuf);
 }
