@@ -63,6 +63,26 @@ int main(void)
 {
     RcliInit();
 
+    unsigned char b[128];
+    int i = 0;
+    sprintf(b, "Hello%s world\n", "\e[X");
+    while(b[i] != '\n')
+    {
+        //if (b[i] >= 32 && b[i] <= 254 && b[i] != 127)
+        //{
+            RcliTransferChar(b[i]);
+            BufAdd(&bufStruct, b[i], 0);
+        //}
+        i++;
+    }
+    sprintf(rcli_out_buf, "\n%s", RCLI_PROMPT_STR);
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+
+    printf("\n===========\n");
+
+    BufDebug(bufStruct);
+    //return 0;
+
     BufAdd(&bufStruct, 'a', 0);
     BufAdd(&bufStruct, 'b', 0);
     BufAdd(&bufStruct, 'c', 0);
@@ -98,17 +118,22 @@ int main(void)
     BufAdd(&bufStruct, 'c', 0);
     printf("%s\n", buf);
 
-    // char ch;
-    // while(1)
-    // {
-    //     ch = getc(stdin);
-    //     // HandleSymbol(ch);
-    // }
+printf("Please enter a line:\n");
+
+  char *line = NULL;
+
+  size_t len = 0;
+
+  ssize_t lineSize = 0;
+
+  lineSize = getline(&line, &len, stdin);
+
+  printf("You entered %d %d %d, which has %zu chars.\n", line[0], line[1], line[2], lineSize -1);
+  printf("You entered %s, which has %zu chars.\n", line, lineSize -1);
+
+  free(line);
 
     char ch;
-//    ch = 65;
-//    func(&ch);
-//    system ("/bin/stty raw");
     while(1)
     {
         ch = getc(stdin);
