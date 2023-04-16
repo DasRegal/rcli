@@ -3,11 +3,11 @@
 
 #include "buf.h"
 
-// static void BufDebug(ctrlBuf_s *bufStruct);
+// static void buf_debug(ctrlBuf_s *bufStruct);
 
-unsigned char BufInit(ctrlBuf_s *bufStruct, unsigned char *pBuf, unsigned char max_size)
+char buf_init(ctrlBuf_s *bufStruct, char *pBuf, unsigned char max_size)
 {
-    unsigned char res   = 0;
+    char res   = 0;
 
     if (bufStruct == NULL)
     {
@@ -23,9 +23,9 @@ unsigned char BufInit(ctrlBuf_s *bufStruct, unsigned char *pBuf, unsigned char m
     return res;
 }
 
-unsigned char BufAdd(ctrlBuf_s *bufStruct, unsigned char symbol, unsigned char pos)
+char buf_add(ctrlBuf_s *bufStruct, char symbol, unsigned char pos)
 {
-    unsigned char res = 0;
+    char res = 0;
 
     if (bufStruct == NULL)
     {
@@ -38,9 +38,9 @@ unsigned char BufAdd(ctrlBuf_s *bufStruct, unsigned char symbol, unsigned char p
     }
 
     unsigned char end    = bufStruct->end;
-    unsigned char *pBuf  = bufStruct->pBuf;
-    unsigned char *pDest = NULL;
-    unsigned char *pSrc  = NULL;
+    char *pBuf  = bufStruct->pBuf;
+    char *pDest = NULL;
+    char *pSrc  = NULL;
     unsigned char len    = 0;
 
     if (pos > end + 1)
@@ -60,8 +60,8 @@ unsigned char BufAdd(ctrlBuf_s *bufStruct, unsigned char symbol, unsigned char p
 
     if (len > 0)
     {
-        pSrc  = pBuf + sizeof(unsigned char) * (end - pos + 1);
-        pDest = pSrc + sizeof(unsigned char);
+        pSrc  = pBuf + sizeof(char) * (end - pos + 1);
+        pDest = pSrc + sizeof(char);
         memcpy(pDest, pSrc, len);
     }
     pBuf[end - len] = symbol;
@@ -73,9 +73,9 @@ unsigned char BufAdd(ctrlBuf_s *bufStruct, unsigned char symbol, unsigned char p
     return res;
 }
 
-unsigned char BufMoveCur(ctrlBuf_s *bufStruct, dirBuf_e dir)
+char buf_move_cur(ctrlBuf_s *bufStruct, dirBuf_e dir)
 {
-    unsigned char res = 0;
+    char res = 0;
     unsigned char pos;
 
     if (bufStruct == NULL)
@@ -127,13 +127,13 @@ unsigned char BufMoveCur(ctrlBuf_s *bufStruct, dirBuf_e dir)
     return res;
 }
 
-unsigned char BufDel(ctrlBuf_s *bufStruct)
+char buf_del(ctrlBuf_s *bufStruct)
 {
     unsigned char pos;
     unsigned char end;
-    unsigned char *pBuf;
-    unsigned char *pDest = NULL;
-    unsigned char *pSrc  = NULL;
+    char *pBuf;
+    char *pDest = NULL;
+    char *pSrc  = NULL;
     unsigned char len    = 0;
     unsigned char res    = 0;
 
@@ -154,8 +154,8 @@ unsigned char BufDel(ctrlBuf_s *bufStruct)
     if (pos > 2)
     {
         len   = pos - 2;
-        pDest = pBuf + sizeof(unsigned char) * (end - pos + 1);
-        pSrc  = pDest + sizeof(unsigned char);
+        pDest = pBuf + sizeof(char) * (end - pos + 1);
+        pSrc  = pDest + sizeof(char);
         memcpy(pDest, pSrc, len);
     }
 
@@ -171,9 +171,86 @@ unsigned char BufDel(ctrlBuf_s *bufStruct)
     return res;
 }
 
-unsigned char BufClear(ctrlBuf_s *bufStruct)
+char buf_get_count_params(ctrlBuf_s *bufStruct)
 {
-    unsigned char res = 0;
+    char * pBuf;
+    char count = -1;
+
+    if (bufStruct == NULL)
+    {
+        printf("%s: bufStruct cannot be NULL\n", __func__);
+        return -1;
+    }
+
+    pBuf = bufStruct->pBuf;
+
+    if (pBuf == NULL)
+    {
+        printf("%s: pBuf cannot be NULL\n", __func__);
+        return -1;
+    }
+
+    do
+    {
+        while (*pBuf == 32 && *pBuf++);
+        if (*pBuf > 32 && *pBuf <= 126 )
+        {
+            count++;
+            while (*pBuf > 32 && *pBuf <= 126 && *pBuf++);
+        }
+    }
+    while(*pBuf++ != '\0');
+
+    // printf("[!] count %d\n", count);
+    return count;
+}
+
+char buf_get_pos_n_word(ctrlBuf_s *bufStruct, unsigned char n)
+{
+    char * pBuf;
+    char pos = -1;
+    char ret_val = -1;
+
+    if (bufStruct == NULL)
+    {
+        printf("%s: bufStruct cannot be NULL\n", __func__);
+        return -1;
+    }
+
+    pBuf = bufStruct->pBuf;
+
+    if (pBuf == NULL)
+    {
+        printf("%s: pBuf cannot be NULL\n", __func__);
+        return -1;
+    }
+
+    do
+    {
+        while (*pBuf == 32 && *pBuf++)
+        {
+            pos++;
+        }
+
+        if (*pBuf >= 32 && *pBuf <= 126 )
+        {
+            pos++;
+            ret_val = pos;
+            while (*pBuf > 32 && *pBuf <= 126 && *pBuf++)
+            {
+                pos++; 
+            }
+        }
+    }
+    while(*pBuf++ != '\0' && n-- !=0);
+
+    // printf("[!] pos %d\n", ret_val);
+    return ret_val;    
+}
+
+char buf_clear(ctrlBuf_s *bufStruct)
+{
+    char res = 0;
 
     if (bufStruct == NULL)
     {
@@ -190,7 +267,7 @@ unsigned char BufClear(ctrlBuf_s *bufStruct)
     return res;
 }
 
-void BufDebug(ctrlBuf_s bufStruct)
+void buf_debug(ctrlBuf_s bufStruct)
 {
     printf("Debug:\n");
     printf("\t cur_pos: %d\n", bufStruct.cur_pos);
