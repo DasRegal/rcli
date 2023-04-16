@@ -5,8 +5,8 @@ typedef struct
 {
     unsigned char cur_pos;
     unsigned char end;
-    unsigned char is_clear;
-    unsigned char* pBuf;
+    char is_clear;
+    char* pBuf;
     unsigned char max_size;
 } ctrlBuf_s;
 
@@ -18,11 +18,13 @@ typedef enum
     BUF_CUR_END,
 } dirBuf_e;
 
-unsigned char BufInit(ctrlBuf_s *bufStruct, unsigned char *pBuf, unsigned char max_size);
-unsigned char BufAdd(ctrlBuf_s *bufStruct, unsigned char symbol, unsigned char pos);
-unsigned char BufMoveCur(ctrlBuf_s *bufStruct, dirBuf_e dir);
-unsigned char BufDel(ctrlBuf_s *bufStruct);
-unsigned char BufClear(ctrlBuf_s *bufStruct);
-void BufDebug(ctrlBuf_s bufStruct);
+char buf_init(ctrlBuf_s *bufStruct, char *pBuf, unsigned char max_size);
+char buf_add(ctrlBuf_s *bufStruct, char symbol, unsigned char pos);
+char buf_move_cur(ctrlBuf_s *bufStruct, dirBuf_e dir);
+char buf_del(ctrlBuf_s *bufStruct);
+char buf_get_count_params(ctrlBuf_s *bufStruct);
+char buf_get_pos_n_word(ctrlBuf_s *bufStruct, unsigned char n);
+char buf_clear(ctrlBuf_s *bufStruct);
+void buf_debug(ctrlBuf_s bufStruct);
 
 #endif

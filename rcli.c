@@ -6,17 +6,19 @@
 
 #define BUF_MAX 128
 
-static unsigned char buf[BUF_MAX];
-static unsigned char rcli_out_buf[BUF_MAX];
+static char buf[BUF_MAX];
+static char rcli_out_buf[BUF_MAX];
 
 static ctrlBuf_s bufStruct;
 
 #define RCLI_PROMPT_STR   "> "
 #define RCLI_PROMPT_SHIFT 2    /* strlen of RCLI_PROMPT_STR */
 
-unsigned char RcliTransferChar(const char ch)
+char RcliTransferChar(const char ch)
 {
-    printf("%c", ch);
+    if (ch != '\0')
+        printf("%c", ch);
+
     return 0;
 }
 
@@ -24,9 +26,9 @@ void RcliReceiveChar(char ch)
 {
 }
 
-static unsigned char RcliTransferStr(unsigned char * const pBuf, unsigned char len)
+static char RcliTransferStr(char * const pBuf, unsigned char len)
 {
-    unsigned char *buf = pBuf;
+    char *buf = pBuf;
 
     if (len > BUF_MAX)
     {
@@ -37,7 +39,7 @@ static unsigned char RcliTransferStr(unsigned char * const pBuf, unsigned char l
     {
         return 1;
     }
-
+    
     while(len--)
     {
         if (RcliTransferChar(*buf++) != 0)
@@ -51,7 +53,7 @@ static unsigned char RcliTransferStr(unsigned char * const pBuf, unsigned char l
 
 void RcliInit(void)
 {
-    BufInit(&bufStruct, buf, BUF_MAX);
+    buf_init(&bufStruct, buf, BUF_MAX);
     sprintf(rcli_out_buf, "Welcome (RCli)\n");
     RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
     
@@ -59,98 +61,309 @@ void RcliInit(void)
     RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
 }
 
+char raw_buf[BUF_MAX];
+char operate_buf[BUF_MAX];
+
+#define RCLI_ARGS_LENGTH    10
+#define RCLI_ARGS_MAX_COUNT 10
+char echo_func_cmd(unsigned char args, void* argv)
+{
+    printf("Hello from echo callback!\n");
+
+    return 0;
+}
+
+char cmd_func_cmd(unsigned char args, void* argv)
+{
+    printf("Hello from cmd callback!%d - %s\n", args, (char *)(argv)+RCLI_ARGS_LENGTH*1);
+
+    return 0;
+}
+
+char status_func_cmd(unsigned char args, void* argv)
+{
+    printf("params=%d\n", args);
+
+    if (args == 2)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "get") == 0)
+        {
+            printf("[!] GET\n");
+        }
+    }
+
+    if (args ==3)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "set") == 0)
+        {
+            int val = atoi((char*)(argv) + RCLI_ARGS_LENGTH * 2);
+            printf("[!] SET %d\n", val);
+        }
+    }
+    return 0;
+}
+
+typedef char (*cb_t)(unsigned char args, void* argv);
+typedef struct
+{
+    char argc;
+    char ** argv;
+    cb_t func;
+} rcli_cmd_t;
+
+rcli_cmd_t rcli_commands[] = 
+{
+    { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
+    { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
+    { 3, (char*[]){ "status", "set", "get"}, status_func_cmd },
+    { 1, NULL, NULL }
+};
+
+#define RCLI_CMD_SIZE ( sizeof(rcli_commands) / sizeof(rcli_cmd_t) )
+
+char rcli_parse_cmd(ctrlBuf_s *bufStruct)
+{
+    char pos = -1;
+    char res = -1;
+    unsigned char n = 0;
+    // printf("---\n%s\n---\n", bufStruct->pBuf);
+    
+    res = buf_get_count_params(bufStruct); 
+    
+    if (res == -1)
+    {
+        printf("%s: Error get count params\n", __func__);
+        return -1;
+    }
+
+    if (res == 0)
+    {
+        return 0;
+    }
+
+    // Get first word position
+    pos = buf_get_pos_n_word(bufStruct, 0);
+
+    if (pos == -1)
+    {
+        printf("%s: Error get %d word position\n", __func__, n);
+        return -1;
+    }
+
+    int i = 0; 
+    for (i = 0; i < RCLI_CMD_SIZE; i++)
+    {
+        if (rcli_commands[i].argv == NULL)
+        {
+            printf("%s: rcli command is NULL. Check rcli_commands %d line.\n", __func__, i + 1);
+            continue;
+        }
+
+        char * pCmdPos = strstr(bufStruct->pBuf, rcli_commands[i].argv[0]);
+        if (pCmdPos != bufStruct->pBuf + pos)
+        {
+            // printf("NOT CALLBACK\n");
+        }
+        else
+        {
+            unsigned char args = 0; 
+            char arr[RCLI_ARGS_MAX_COUNT][RCLI_ARGS_LENGTH];
+
+            char * ptr = bufStruct->pBuf;
+            char * head = ptr;
+            do
+            {
+                while(*ptr == 32)
+                {
+                    ptr++;
+                }
+                head = ptr;
+                while(*ptr != 32 && *ptr != '\0')
+                {
+                    ptr++;
+                }
+                strncpy(arr[args], head, ptr - head);
+                arr[args][ptr-head] = '\0';
+                if (head != ptr)
+                {
+                    args++;
+                }
+            }
+            while (*ptr++);
+
+            if (rcli_commands[i].func != NULL)
+            {
+                if (rcli_commands[i].func(args, (char**)arr) == -1)
+                    printf("ERROR\n");
+            }
+            break;
+        }
+    }
+
+    if (i == RCLI_CMD_SIZE)
+    {
+        printf("Command not found\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+void rcli_parse_buf(char * buf)
+{
+    char *p_tmp;
+    char pos = 0;
+    // block uart
+    if (buf == NULL)
+        return;
+    
+    if (buf[0]=='\0')
+        return;
+
+    p_tmp = buf;
+
+    strncpy(operate_buf, buf, BUF_MAX); 
+    // printf("%s", operate_buf);
+
+    do
+    {
+        if (*p_tmp >= 32 && *p_tmp <= 126)
+        {
+            buf_add(&bufStruct, *p_tmp, 0);
+            //printf("%c; ", *p_tmp);
+        }
+
+        if (*p_tmp == 10)
+        {
+            if (rcli_parse_cmd(&bufStruct) == -1)
+            {
+                buf_clear(&bufStruct);
+                break;
+            }
+            buf_clear(&bufStruct);
+        }
+    }
+    while(*p_tmp++);
+    buf[0] = '\0';
+    //unblock uart
+}
+
+void uart_rx(void)
+{
+   sprintf(raw_buf, " status   get \n status set 3\n");
+
+   // Call parse after timeout
+   rcli_parse_buf(raw_buf);
+}
+
+
 int main(void)
 {
-    RcliInit();
 
-    unsigned char b[128];
+
+//    char ** p = (char**)rcli_commands[0].params;
+//    printf(">%ld<\n", sizeof(p)/sizeof(p[0]));
+    
+    for (char **arg = rcli_commands[0].argv; *arg != NULL; ++arg)
+    {
+        printf("Arg %s\n", *arg);
+    }
+
+    RcliInit();
+    raw_buf[0] = '\n';
+    uart_rx();
+
+    printf("\n\nBoot...\n");
+    return 0; 
+
+
+    char b[128];
     int i = 0;
-    sprintf(b, "Hello%s world\n", "\e[X");
+//    sprintf(b, "Hello%s world\n", "\e[X");
+    sprintf(b, "Hello world\n");
     while(b[i] != '\n')
     {
         //if (b[i] >= 32 && b[i] <= 254 && b[i] != 127)
         //{
             RcliTransferChar(b[i]);
-            BufAdd(&bufStruct, b[i], 0);
+            buf_add(&bufStruct, b[i], 0);
         //}
         i++;
     }
+    /* parse */
+
+    /* next command */
     sprintf(rcli_out_buf, "\n%s", RCLI_PROMPT_STR);
     RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
 
     printf("\n===========\n");
 
-    BufDebug(bufStruct);
+    buf_debug(bufStruct);
     //return 0;
 
-    BufAdd(&bufStruct, 'a', 0);
-    BufAdd(&bufStruct, 'b', 0);
-    BufAdd(&bufStruct, 'c', 0);
-    BufAdd(&bufStruct, 'd', 0);
-    BufAdd(&bufStruct, 'e', 0);
-    BufMoveCur(&bufStruct, BUF_CUR_LEFT);
-    BufMoveCur(&bufStruct, BUF_CUR_LEFT);
-    BufMoveCur(&bufStruct, BUF_CUR_LEFT);
-    BufMoveCur(&bufStruct, BUF_CUR_LEFT);
-    BufAdd(&bufStruct, '3', 0);
-    BufMoveCur(&bufStruct, BUF_CUR_RIGHT);
-    BufMoveCur(&bufStruct, BUF_CUR_RIGHT);
-    BufMoveCur(&bufStruct, BUF_CUR_RIGHT);
-    BufAdd(&bufStruct, '4', 0);
-    BufMoveCur(&bufStruct, BUF_CUR_HOME);
-    BufAdd(&bufStruct, 'H', 0);
-    BufMoveCur(&bufStruct, BUF_CUR_END);
-    BufAdd(&bufStruct, 'E', 0);
+    buf_add(&bufStruct, 'a', 0);
+    buf_add(&bufStruct, 'b', 0);
+    buf_add(&bufStruct, 'c', 0);
+    buf_add(&bufStruct, 'd', 0);
+    buf_add(&bufStruct, 'e', 0);
+    buf_move_cur(&bufStruct, BUF_CUR_LEFT);
+    buf_move_cur(&bufStruct, BUF_CUR_LEFT);
+    buf_move_cur(&bufStruct, BUF_CUR_LEFT);
+    buf_move_cur(&bufStruct, BUF_CUR_LEFT);
+    buf_add(&bufStruct, '3', 0);
+    buf_move_cur(&bufStruct, BUF_CUR_RIGHT);
+    buf_move_cur(&bufStruct, BUF_CUR_RIGHT);
+    buf_move_cur(&bufStruct, BUF_CUR_RIGHT);
+    buf_add(&bufStruct, '4', 0);
+    buf_move_cur(&bufStruct, BUF_CUR_HOME);
+    buf_add(&bufStruct, 'H', 0);
+    buf_move_cur(&bufStruct, BUF_CUR_END);
+    buf_add(&bufStruct, 'E', 0);
 
     printf("%s\n", buf);
 
-    BufMoveCur(&bufStruct, BUF_CUR_HOME);
-    BufDel(&bufStruct);
+    buf_move_cur(&bufStruct, BUF_CUR_HOME);
+    buf_del(&bufStruct);
     printf("%s\n", buf);
 
     printf("Clear buf...\n");
-    BufClear(&bufStruct);
+    buf_clear(&bufStruct);
     printf("%s\nDone\n", buf);
-    BufDebug(bufStruct);
+    buf_debug(bufStruct);
 
-    BufAdd(&bufStruct, 'a', 0);
-    BufAdd(&bufStruct, 'b', 0);
-    BufAdd(&bufStruct, 'c', 0);
+    buf_add(&bufStruct, 'a', 0);
+    buf_add(&bufStruct, 'b', 0);
+    buf_add(&bufStruct, 'c', 0);
     printf("%s\n", buf);
 
-printf("Please enter a line:\n");
+    return 0;
 
-  char *line = NULL;
-
-  size_t len = 0;
-
-  ssize_t lineSize = 0;
-
-  lineSize = getline(&line, &len, stdin);
-
-  printf("You entered %d %d %d, which has %zu chars.\n", line[0], line[1], line[2], lineSize -1);
-  printf("You entered %s, which has %zu chars.\n", line, lineSize -1);
-
-  free(line);
-
-    char ch;
-    while(1)
+    int c;
+    system ("/bin/stty raw");
+    system("stty -echo");
+    while((c=getchar())!= '.') 
     {
-        ch = getc(stdin);
-        if (ch == '\033')
+        if (c >= 32 && c < 127)
+        putchar(c);
+        if (c == '\033')
         {
-            printf("here 0\n");
-            if (!getc(stdin))
-                break;
-            if (getc(stdin) == 'D')
+            c = getchar();
+            if (c == '[')
             {
-                printf("\e[%dA\e[K", 2);
+                c = getchar();
+                if (c == 'D')
+                {
+                    //printf("\e[%dD\e[K", 5);
+                    printf("\e[%dD", 1);
+                }
+                if (c == 'C')
+                {
+                    printf("\e[%dC", 1);
+                }
             }
-            else
-                printf("\e[%dD\e[K", 4);
         }
-        else
-            printf("\e[%dD%c", 1, ch);
     }
+    system ("/bin/stty cooked");
+    system("stty echo");
     return 0;
 }
