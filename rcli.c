@@ -273,11 +273,70 @@ void uart_rx(void)
     //sprintf(raw_buf, " status   get \n status set 3\n");
     int i = 0;
     int c;
+    int esc_status = 0;
     system ("/bin/stty raw");
     system("stty -echo");
     while((c=getchar())!= '.') 
     {
-        if (c >= 32 && c < 127 || c == 13)
+        //printf(".%d.", c);
+
+        switch(esc_status)
+        {
+            case 0:
+                switch(c)
+                {
+                    case 27: esc_status = 1; break;
+                    default: esc_status = 0; break;
+                }
+                break;
+            case 1:
+                switch(c)
+                {
+                    case 91: esc_status = 2; break;
+                    default: esc_status = 0; break;
+                }
+                break;
+            case 2:
+                switch(c)
+                {
+                    case 'D': esc_status = 3; break;
+                    case 'C': esc_status = 4; break;
+                    default:  esc_status = 5; break;
+                }
+                break;
+            default: 
+                esc_status = 0;
+                break;
+        }
+
+        switch(esc_status)
+        {
+            case 0:
+                break;
+            case 3:
+                printf("<-");
+                esc_status = 0;
+                continue;
+            case 4:
+                printf("->");
+                esc_status = 0;
+                continue;
+            case 5:
+                esc_status = 0;
+                continue;
+            default:
+                continue;
+        }
+
+        if (c == 127)
+        {
+            i--;
+            buf_del(&bufStruct);
+            printf("\e[%dD ", 1);
+            printf("\e[%dD", 1);
+            continue;
+        }
+        if ((c >= 32 && c < 127) || c == 13)
         {
             putchar(c);
             raw_buf[i] = c;
