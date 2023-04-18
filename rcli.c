@@ -4,6 +4,12 @@
 
 #include "buf.h"
 
+#ifdef DEBUG
+# define DEBUG_PRINT(x) printf x
+#else
+# define DEBUG_PRINT(x) do {} while (0)
+#endif
+
 #define BUF_MAX 128
 
 static char buf[BUF_MAX];
@@ -11,8 +17,8 @@ static char rcli_out_buf[BUF_MAX];
 
 static ctrlBuf_s bufStruct;
 
-#define RCLI_PROMPT_STR   "> "
-#define RCLI_PROMPT_SHIFT 2    /* strlen of RCLI_PROMPT_STR */
+#define RCLI_PROMPT_STR   "cli> "
+#define RCLI_PROMPT_SHIFT 5    /* strlen of RCLI_PROMPT_STR */
 
 char RcliTransferChar(const char ch)
 {
@@ -68,27 +74,28 @@ char operate_buf[BUF_MAX];
 #define RCLI_ARGS_MAX_COUNT 10
 char echo_func_cmd(unsigned char args, void* argv)
 {
-    printf("Hello from echo callback!\n");
+    printf("Hello from echo callback!\r\n");
 
     return 0;
 }
 
 char cmd_func_cmd(unsigned char args, void* argv)
 {
-    printf("Hello from cmd callback!%d - %s\n", args, (char *)(argv)+RCLI_ARGS_LENGTH*1);
+//    printf("Hello from cmd callback!%d - %s\r\n", args, (char *)(argv)+RCLI_ARGS_LENGTH*1);
 
     return 0;
 }
 
 char status_func_cmd(unsigned char args, void* argv)
 {
-    printf("params=%d\n", args);
+    printf("params=%d\r\n", args);
 
     if (args == 2)
     {
         if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "get") == 0)
         {
-            printf("[!] GET\n");
+            printf("[!] GET\r\n");
+            return 0;
         }
     }
 
@@ -97,11 +104,14 @@ char status_func_cmd(unsigned char args, void* argv)
         if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "set") == 0)
         {
             int val = atoi((char*)(argv) + RCLI_ARGS_LENGTH * 2);
-            printf("[!] SET %d\n", val);
+            printf("[!] SET %d\r\n", val);
+            return 0;
         }
     }
-    return 0;
+    return -1;
 }
+
+char help_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -115,11 +125,21 @@ rcli_cmd_t rcli_commands[] =
 {
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
     { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
-    { 3, (char*[]){ "status", "set", "get"}, status_func_cmd },
-    { 1, NULL, NULL }
+    { 3, (char*[]){ "status", "set", "get", NULL}, status_func_cmd },
+    { 1, (char*[]){ "help", NULL}, help_func_cmd },
+    { 1, (char*[]){ "?", NULL}, help_func_cmd }
 };
 
 #define RCLI_CMD_SIZE ( sizeof(rcli_commands) / sizeof(rcli_cmd_t) )
+
+char help_func_cmd(unsigned char args, void* argv)
+{
+    for (int i = 0; i < RCLI_CMD_SIZE - 1; i++)
+    {
+        printf("  %s\r\n", (char*)rcli_commands[i].argv[0]);
+    }
+    return 0;
+}
 
 char rcli_parse_cmd(ctrlBuf_s *bufStruct)
 {
@@ -132,7 +152,7 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
     
     if (res == -1)
     {
-        printf("%s: Error get count params\n", __func__);
+        DEBUG_PRINT(("%s: Error get count params\n", __func__));
         return -1;
     }
 
@@ -146,7 +166,7 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
 
     if (pos == -1)
     {
-        printf("%s: Error get %d word position\n", __func__, n);
+        DEBUG_PRINT(("%s: Error get %d word position\n", __func__, n));
         return -1;
     }
 
@@ -155,14 +175,14 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
     {
         if (rcli_commands[i].argv == NULL)
         {
-            printf("%s: rcli command is NULL. Check rcli_commands %d line.\n", __func__, i + 1);
+            DEBUG_PRINT(("%s: rcli command is NULL. Check rcli_commands %d line.\n", __func__, i + 1));
             continue;
         }
 
         char * pCmdPos = strstr(bufStruct->pBuf, rcli_commands[i].argv[0]);
         if (pCmdPos != bufStruct->pBuf + pos)
         {
-            // printf("NOT CALLBACK\n");
+            // printf("NOT CALLBACK\r\n");
         }
         else
         {
@@ -200,9 +220,9 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
         }
     }
 
-    if (i == RCLI_CMD_SIZE)
+    if (i >= RCLI_CMD_SIZE)
     {
-        printf("Command not found\n");
+        printf("Command not found\r\n");
         return -1;
     }
 
@@ -233,7 +253,7 @@ void rcli_parse_buf(char * buf)
             //printf("%c; ", *p_tmp);
         }
 
-        if (*p_tmp == 10)
+        if (*p_tmp == 13)
         {
             if (rcli_parse_cmd(&bufStruct) == -1)
             {
@@ -250,10 +270,34 @@ void rcli_parse_buf(char * buf)
 
 void uart_rx(void)
 {
-   sprintf(raw_buf, " status   get \n status set 3\n");
-
+    //sprintf(raw_buf, " status   get \n status set 3\n");
+    int i = 0;
+    int c;
+    system ("/bin/stty raw");
+    system("stty -echo");
+    while((c=getchar())!= '.') 
+    {
+        if (c >= 32 && c < 127 || c == 13)
+        {
+            putchar(c);
+            raw_buf[i] = c;
+            if (i >= BUF_MAX)
+                continue;
+            i++;
+        }
+        if (c == 13)
+        {
+            raw_buf[i] = '\0';
+            i = 0;
+            printf("\r\n");
+            rcli_parse_buf(raw_buf);
+    sprintf(rcli_out_buf, "\r%s", RCLI_PROMPT_STR);
+    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        }
+    }
+    system ("/bin/stty cooked");
+    system("stty echo");
    // Call parse after timeout
-   rcli_parse_buf(raw_buf);
 }
 
 
@@ -264,13 +308,13 @@ int main(void)
 //    char ** p = (char**)rcli_commands[0].params;
 //    printf(">%ld<\n", sizeof(p)/sizeof(p[0]));
     
-    for (char **arg = rcli_commands[0].argv; *arg != NULL; ++arg)
-    {
-        printf("Arg %s\n", *arg);
-    }
+//    for (char **arg = rcli_commands[0].argv; *arg != NULL; ++arg)
+//    {
+//        printf("Arg %s\n", *arg);
+//    }
 
     RcliInit();
-    raw_buf[0] = '\n';
+    raw_buf[0] = '\0';
     uart_rx();
 
     printf("\n\nBoot...\n");

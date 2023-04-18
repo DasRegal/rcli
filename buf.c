@@ -174,7 +174,7 @@ char buf_del(ctrlBuf_s *bufStruct)
 char buf_get_count_params(ctrlBuf_s *bufStruct)
 {
     char * pBuf;
-    char count = -1;
+    char count = 0;
 
     if (bufStruct == NULL)
     {
