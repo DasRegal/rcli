@@ -10,14 +10,14 @@
 # define DEBUG_PRINT(x) do {} while (0)
 #endif
 
-#define BUF_MAX 128
+#define BUF_MAX 30
 
 static char buf[BUF_MAX];
 static char rcli_out_buf[BUF_MAX];
 
 static ctrlBuf_s bufStruct;
 
-#define RCLI_PROMPT_STR   "cli> "
+#define RCLI_PROMPT_STR   "\r\e[38;5;15m\e[1mRVM>\e[0m "
 #define RCLI_PROMPT_SHIFT 5    /* strlen of RCLI_PROMPT_STR */
 
 char RcliTransferChar(const char ch)
@@ -242,26 +242,25 @@ void rcli_parse_buf(char * buf)
 
     p_tmp = buf;
 
-    strncpy(operate_buf, buf, BUF_MAX); 
-    // printf("%s", operate_buf);
-
     do
     {
-        if (*p_tmp >= 32 && *p_tmp <= 126)
+        /*if (*p_tmp >= 32 && *p_tmp <= 126)
         {
             buf_add(&bufStruct, *p_tmp, 0);
             //printf("%c; ", *p_tmp);
-        }
+        }*/
 
-        if (*p_tmp == 13)
-        {
+        /*if (*p_tmp == 13)
+        {*/
             if (rcli_parse_cmd(&bufStruct) == -1)
             {
+            buf_debug(bufStruct);
                 buf_clear(&bufStruct);
                 break;
             }
+            buf_debug(bufStruct);
             buf_clear(&bufStruct);
-        }
+        //}
     }
     while(*p_tmp++);
     buf[0] = '\0';
@@ -314,12 +313,18 @@ void uart_rx(void)
             case 0:
                 break;
             case 3:
-                printf("<-");
                 esc_status = 0;
+                if (bufStruct.cur_pos > bufStruct.end)
+                    continue;
+                buf_move_cur(&bufStruct, BUF_CUR_LEFT);
+                printf("\e[%dD", 1);
                 continue;
             case 4:
-                printf("->");
                 esc_status = 0;
+                if (bufStruct.cur_pos == 1)
+                    continue;
+                buf_move_cur(&bufStruct, BUF_CUR_RIGHT);
+                printf("\e[%dC", 1);
                 continue;
             case 5:
                 esc_status = 0;
@@ -330,28 +335,45 @@ void uart_rx(void)
 
         if (c == 127)
         {
-            i--;
+            if (bufStruct.end == 0)
+                continue;
+            buf_move_cur(&bufStruct, BUF_CUR_LEFT);
             buf_del(&bufStruct);
             printf("\e[%dD ", 1);
             printf("\e[%dD", 1);
             continue;
         }
-        if ((c >= 32 && c < 127) || c == 13)
+        if ((c >= 32 && c < 127))
         {
-            putchar(c);
-            raw_buf[i] = c;
+            buf_add(&bufStruct, c, 0);
+
+            if(bufStruct.cur_pos != 1)
+            {
+                char pos = bufStruct.end - bufStruct.cur_pos;
+                if (pos > 0)
+                {
+                    printf("\e[%dD", pos);
+                }
+                printf("%s", bufStruct.pBuf);
+                printf("\e[%dD", bufStruct.cur_pos - 1);
+            }
+            else
+                putchar(c);
+
             if (i >= BUF_MAX)
                 continue;
             i++;
         }
         if (c == 13)
         {
-            raw_buf[i] = '\0';
-            i = 0;
             printf("\r\n");
-            rcli_parse_buf(raw_buf);
-    sprintf(rcli_out_buf, "\r%s", RCLI_PROMPT_STR);
-    RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            rcli_parse_buf(bufStruct.pBuf);
+
+            //buf_debug(bufStruct);
+            buf_clear(&bufStruct);
+            
+            sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
         }
     }
     system ("/bin/stty cooked");
