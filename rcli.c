@@ -16,8 +16,14 @@ static char buf[BUF_MAX];
 static char rcli_out_buf[BUF_MAX];
 
 static ctrlBuf_s bufStruct;
+static char isSetColor;
 
-#define RCLI_PROMPT_STR   "\r\e[38;5;15m\e[1mRVM>\e[0m "
+#define RCLI_STR_WARNING(str)           (isSetColor ? "\e[38;5;11m" str "\e[0m" : str)
+#define RCLI_STR_ERROR(str)             (isSetColor ? "\e[38;5;1m" str "\e[0m" : str)
+#define RCLI_PROMPT_SET_COLOR_STR       "\r\e[38;5;15m\e[1mconsole>\e[0m "
+#define RCLI_PROMPT_CLEAR_COLOR_STR     "\rconsole> "
+#define RCLI_PROMPT(str)                (isSetColor ? "\e[38;5;15m\e[1m" str "\e[0m" : str)
+#define RCLI_PROMPT_STR                 RCLI_PROMPT("\rConsole> ") 
 #define RCLI_PROMPT_SHIFT 5    /* strlen of RCLI_PROMPT_STR */
 
 char RcliTransferChar(const char ch)
@@ -59,6 +65,7 @@ static char RcliTransferStr(char * const pBuf, unsigned char len)
 
 void RcliInit(void)
 {
+    isSetColor = 1;
     buf_init(&bufStruct, buf, BUF_MAX);
     sprintf(rcli_out_buf, "Welcome (RCli)\n");
     RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
@@ -112,6 +119,7 @@ char status_func_cmd(unsigned char args, void* argv)
 }
 
 char help_func_cmd(unsigned char args, void* argv);
+char console_func_cmd(unsigned char args, void* argv);
 
 typedef char (*cb_t)(unsigned char args, void* argv);
 typedef struct
@@ -124,6 +132,7 @@ typedef struct
 rcli_cmd_t rcli_commands[] = 
 {
     { 3, (char*[]){ "cmd", "ddd", "q", NULL }, cmd_func_cmd },
+    { 1, (char*[]){ "console", NULL}, console_func_cmd },
     { 1, (char*[]){ "echo", NULL}, echo_func_cmd },
     { 3, (char*[]){ "status", "set", "get", NULL}, status_func_cmd },
     { 1, (char*[]){ "help", NULL}, help_func_cmd },
@@ -139,6 +148,52 @@ char help_func_cmd(unsigned char args, void* argv)
         printf("  %s\r\n", (char*)rcli_commands[i].argv[0]);
     }
     return 0;
+}
+
+char console_func_cmd(unsigned char args, void* argv)
+{
+    char * help_str = 
+"Usage: console [OPTION]\r\n\r\n\
+  color set|clear\t\tSet color theme\r\n";
+
+    if (args == 1)
+    {
+        printf("%s", help_str);
+        return 0;
+    }
+
+    if (args == 2)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "color") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "help") == 0 ||
+            strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "?") == 0)
+        {
+            printf("%s", help_str);
+            return 0;
+        }
+    }
+
+    if (args == 3)
+    {
+        if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 1, "color") == 0)
+        {
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "set") == 0)
+            {
+                isSetColor = 1;
+                printf("Example: %s %s %s\r\n", RCLI_STR_ERROR("Error"), RCLI_STR_WARNING("Warning"), RCLI_PROMPT("Prompt"));
+                return 0;
+            }
+            if (strcmp((char*)(argv) + RCLI_ARGS_LENGTH * 2, "clear") == 0)
+            {
+                isSetColor = 0;
+                printf("Example: %s %s %s\r\n", RCLI_STR_ERROR("Error"), RCLI_STR_WARNING("Warning"), RCLI_PROMPT("Prompt"));
+                return 0;
+            }
+        }
+    }
+
+    printf("Bad params\r\n");
+    return -1;
 }
 
 char rcli_parse_cmd(ctrlBuf_s *bufStruct)
@@ -254,11 +309,11 @@ void rcli_parse_buf(char * buf)
         {*/
             if (rcli_parse_cmd(&bufStruct) == -1)
             {
-            buf_debug(bufStruct);
+            //buf_debug(bufStruct);
                 buf_clear(&bufStruct);
                 break;
             }
-            buf_debug(bufStruct);
+            //buf_debug(bufStruct);
             buf_clear(&bufStruct);
         //}
     }
