@@ -171,18 +171,12 @@ char buf_del(ctrlBuf_s *bufStruct)
     return res;
 }
 
-char buf_get_count_params(ctrlBuf_s *bufStruct)
+char buf_get_count_params(ctrlBuf_s bufStruct)
 {
     char * pBuf;
     char count = 0;
 
-    if (bufStruct == NULL)
-    {
-        printf("%s: bufStruct cannot be NULL\n", __func__);
-        return -1;
-    }
-
-    pBuf = bufStruct->pBuf;
+    pBuf = bufStruct.pBuf;
 
     if (pBuf == NULL)
     {
@@ -205,19 +199,13 @@ char buf_get_count_params(ctrlBuf_s *bufStruct)
     return count;
 }
 
-char buf_get_pos_n_word(ctrlBuf_s *bufStruct, unsigned char n)
+char buf_get_pos_n_word(ctrlBuf_s bufStruct, unsigned char n)
 {
     char * pBuf;
     char pos = -1;
     char ret_val = -1;
 
-    if (bufStruct == NULL)
-    {
-        printf("%s: bufStruct cannot be NULL\n", __func__);
-        return -1;
-    }
-
-    pBuf = bufStruct->pBuf;
+    pBuf = bufStruct.pBuf;
 
     if (pBuf == NULL)
     {

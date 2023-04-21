@@ -196,7 +196,7 @@ char console_func_cmd(unsigned char args, void* argv)
     return -1;
 }
 
-char rcli_parse_cmd(ctrlBuf_s *bufStruct)
+char rcli_parse_cmd(ctrlBuf_s bufStruct)
 {
     char pos = -1;
     char res = -1;
@@ -234,8 +234,8 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
             continue;
         }
 
-        char * pCmdPos = strstr(bufStruct->pBuf, rcli_commands[i].argv[0]);
-        if (pCmdPos != bufStruct->pBuf + pos)
+        char * pCmdPos = strstr(bufStruct.pBuf, rcli_commands[i].argv[0]);
+        if (pCmdPos != bufStruct.pBuf + pos)
         {
             // printf("NOT CALLBACK\r\n");
         }
@@ -244,7 +244,7 @@ char rcli_parse_cmd(ctrlBuf_s *bufStruct)
             unsigned char args = 0; 
             char arr[RCLI_ARGS_MAX_COUNT][RCLI_ARGS_LENGTH];
 
-            char * ptr = bufStruct->pBuf;
+            char * ptr = bufStruct.pBuf;
             char * head = ptr;
             do
             {
@@ -307,13 +307,13 @@ void rcli_parse_buf(char * buf)
 
         /*if (*p_tmp == 13)
         {*/
-            if (rcli_parse_cmd(&bufStruct) == -1)
+            if (rcli_parse_cmd(bufStruct) == -1)
             {
-            //buf_debug(bufStruct);
+            buf_debug(bufStruct);
                 buf_clear(&bufStruct);
                 break;
             }
-            //buf_debug(bufStruct);
+            buf_debug(bufStruct);
             buf_clear(&bufStruct);
         //}
     }
@@ -388,6 +388,7 @@ void uart_rx(void)
                 continue;
         }
 
+        // BACKSPACE
         if (c == 127)
         {
             if (bufStruct.end == 0)
@@ -398,6 +399,8 @@ void uart_rx(void)
             printf("\e[%dD", 1);
             continue;
         }
+
+        // LETTER
         if ((c >= 32 && c < 127))
         {
             buf_add(&bufStruct, c, 0);
@@ -419,6 +422,8 @@ void uart_rx(void)
                 continue;
             i++;
         }
+
+        // ENTER
         if (c == 13)
         {
             printf("\r\n");
@@ -429,6 +434,39 @@ void uart_rx(void)
             
             sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
             RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+        }
+
+        // TAB
+        if (c == 9)
+        {
+            printf("\r\n");
+            if( buf_get_count_params(bufStruct) == 1)
+            {
+               
+                int i;
+                int count_words = 0;
+                for (i = 0; i < RCLI_CMD_SIZE - 1; i++)
+                {
+                    char * pstr = strstr((char*)rcli_commands[i].argv[0], bufStruct.pBuf);
+                    if(pstr == rcli_commands[i].argv[0])
+                    {
+                        //printf("p=%p, cmd=%p\r\n", pBuf, (char*)rcli_commands[i].argv[0]);
+                        printf("  %s\r\n", (char*)rcli_commands[i].argv[0]);
+                        count_words++;
+                    }
+                }
+                if(count_words == 1)
+                {
+                    printf("One line i=%d\r\n", i);
+                }
+               // sprintf(rcli_out_buf, "\n%s%s", RCLI_PROMPT_STR, bufStruct.pBuf);
+               //     printf("%s",rcli_out_buf);
+            sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
+            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
+            RcliTransferStr(bufStruct.pBuf, strlen(bufStruct.pBuf));
+
+//                buf_move_cur(&bufStruct, BUF_CUR_END);
+            }
         }
     }
     system ("/bin/stty cooked");
