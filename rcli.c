@@ -10,7 +10,7 @@
 # define DEBUG_PRINT(x) do {} while (0)
 #endif
 
-#define BUF_MAX 30
+#define BUF_MAX 128
 
 static char buf[BUF_MAX];
 static char rcli_out_buf[BUF_MAX];
@@ -309,11 +309,11 @@ void rcli_parse_buf(char * buf)
         {*/
             if (rcli_parse_cmd(bufStruct) == -1)
             {
-            buf_debug(bufStruct);
+            //buf_debug(bufStruct);
                 buf_clear(&bufStruct);
                 break;
             }
-            buf_debug(bufStruct);
+            //buf_debug(bufStruct);
             buf_clear(&bufStruct);
         //}
     }
@@ -439,33 +439,39 @@ void uart_rx(void)
         // TAB
         if (c == 9)
         {
-            printf("\r\n");
             if( buf_get_count_params(bufStruct) == 1)
             {
+                printf("\r\n");
                
                 int i;
                 int count_words = 0;
+                int k = 0;
+                char * cmd_str;
                 for (i = 0; i < RCLI_CMD_SIZE - 1; i++)
                 {
-                    char * pstr = strstr((char*)rcli_commands[i].argv[0], bufStruct.pBuf);
+                    cmd_str = (char*)rcli_commands[i].argv[0];
+
+                    char * pstr = strstr(cmd_str, bufStruct.pBuf);
                     if(pstr == rcli_commands[i].argv[0])
                     {
-                        //printf("p=%p, cmd=%p\r\n", pBuf, (char*)rcli_commands[i].argv[0]);
-                        printf("  %s\r\n", (char*)rcli_commands[i].argv[0]);
+                        printf("  %s\r\n", cmd_str);
+                        k = i;
                         count_words++;
                     }
                 }
+                sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
+                RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
                 if(count_words == 1)
                 {
-                    printf("One line i=%d\r\n", i);
+                    cmd_str = (char*)rcli_commands[k].argv[0]; 
+                    buf_cpy_str(&bufStruct, cmd_str, strlen(cmd_str));
+                    buf_add(&bufStruct, ' ', 0);
+                    RcliTransferStr(bufStruct.pBuf, bufStruct.end);
                 }
-               // sprintf(rcli_out_buf, "\n%s%s", RCLI_PROMPT_STR, bufStruct.pBuf);
-               //     printf("%s",rcli_out_buf);
-            sprintf(rcli_out_buf, "%s", RCLI_PROMPT_STR);
-            RcliTransferStr(rcli_out_buf, strlen(rcli_out_buf));
-            RcliTransferStr(bufStruct.pBuf, strlen(bufStruct.pBuf));
-
-//                buf_move_cur(&bufStruct, BUF_CUR_END);
+                else
+                {
+                    RcliTransferStr(bufStruct.pBuf, strlen(bufStruct.pBuf));
+                }
             }
         }
     }

@@ -236,6 +236,23 @@ char buf_get_pos_n_word(ctrlBuf_s bufStruct, unsigned char n)
     return ret_val;    
 }
 
+char buf_cpy_str(ctrlBuf_s *bufStruct, char *str, unsigned char len)
+{
+    if (bufStruct == NULL)
+    {
+        printf("%s: Sctruct cannot be NULL\n", __func__);
+        return -1;
+    }
+
+    buf_clear(bufStruct);
+    strncpy(bufStruct->pBuf, str, len);
+    bufStruct->cur_pos = 1;
+    bufStruct->end = len;
+    bufStruct->is_clear = 0;
+
+    return 0;
+}
+
 char buf_clear(ctrlBuf_s *bufStruct)
 {
     char res = 0;
