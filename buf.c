@@ -73,6 +73,11 @@ char buf_add(ctrlBuf_s *bufStruct, char symbol, unsigned char pos)
     return res;
 }
 
+char * buf_get_buf(ctrlBuf_s bufStruct)
+{
+    return bufStruct.pBuf;
+}
+
 char buf_move_cur(ctrlBuf_s *bufStruct, dirBuf_e dir)
 {
     char res = 0;

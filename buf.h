@@ -20,6 +20,7 @@ typedef enum
 
 char buf_init(ctrlBuf_s *bufStruct, char *pBuf, unsigned char max_size);
 char buf_add(ctrlBuf_s *bufStruct, char symbol, unsigned char pos);
+char * buf_get_buf(ctrlBuf_s bufStruct);
 char buf_move_cur(ctrlBuf_s *bufStruct, dirBuf_e dir);
 char buf_del(ctrlBuf_s *bufStruct);
 char buf_get_count_params(ctrlBuf_s bufStruct);
