@@ -26,6 +26,7 @@ char buf_del(ctrlBuf_s *bufStruct);
 char buf_get_count_params(ctrlBuf_s bufStruct);
 char buf_get_pos_n_word(ctrlBuf_s bufStruct, unsigned char n);
 char buf_cpy_str(ctrlBuf_s *bufStruct, char *str, unsigned char len);
+char * buf_get_buf_from_pos(ctrlBuf_s bufStruct);
 char buf_clear(ctrlBuf_s *bufStruct);
 void buf_debug(ctrlBuf_s bufStruct);
 

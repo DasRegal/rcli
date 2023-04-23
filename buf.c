@@ -277,6 +277,16 @@ char buf_clear(ctrlBuf_s *bufStruct)
     return res;
 }
 
+char *buf_get_buf_from_pos(ctrlBuf_s bufStruct)
+{
+    char p = bufStruct.end + 1 - bufStruct.cur_pos;
+
+    if (p < 0)
+        return NULL;
+
+    return (char*)(bufStruct.pBuf + p);
+}
+
 void buf_debug(ctrlBuf_s bufStruct)
 {
     printf("Debug:\r\n");

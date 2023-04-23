@@ -384,12 +384,13 @@ void uart_rx(void)
         // BACKSPACE
         if (c == 127)
         {
-            if (bufStruct.end == 0)
+            if (bufStruct.end + 1 - bufStruct.cur_pos == 0)
                 continue;
             buf_move_cur(&bufStruct, BUF_CUR_LEFT);
             buf_del(&bufStruct);
-            printf("\e[%dD ", 1);
             printf("\e[%dD", 1);
+            printf("%s ", buf_get_buf_from_pos(bufStruct));
+            printf("\e[%dD", bufStruct.cur_pos);
             continue;
         }
 
