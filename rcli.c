@@ -316,66 +316,68 @@ void rcli_parse_buf(char * buf)
     //unblock uart
 }
 
+typedef enum
+{
+    ESC_SEQ_OFF_STATE = 0,
+    ESC_SEQ_ESC_SYM_STATE,      /* ESC symbol */
+    ESC_SEQ_CSI_PREFIX_STATE,   /* ESC[ - Control Sequence Introducer (CSI) */
+    ESC_SEQ_CSI_CUF_STATE,      /* ESC[ C - Cursor Forward */
+    ESC_SEQ_CSI_CUB_STATE,      /* ESC[ D - Cursor Back */
+    ESC_SEQ_LAST_STATE
+} esc_seq_state_t;
+
+typedef struct
+{
+    esc_seq_state_t cur_state;
+    esc_seq_state_t matrix_state[ESC_SEQ_LAST_STATE][127];
+} esc_seq_state_mach_t;
+
+esc_seq_state_mach_t es_sm;
+
+void init_esc_seq_state_machine(void)
+{
+    int i, j;
+    for (i = 0; i < ESC_SEQ_LAST_STATE; i++)
+        for (j = 0; j < 127; j++)
+            es_sm.matrix_state[i][j] = ESC_SEQ_OFF_STATE;
+
+    es_sm.cur_state = ESC_SEQ_OFF_STATE;
+
+    es_sm.matrix_state[ESC_SEQ_OFF_STATE]['\e'] = ESC_SEQ_ESC_SYM_STATE;
+    es_sm.matrix_state[ESC_SEQ_ESC_SYM_STATE]['['] = ESC_SEQ_CSI_PREFIX_STATE;
+    es_sm.matrix_state[ESC_SEQ_CSI_PREFIX_STATE]['D'] = ESC_SEQ_CSI_CUB_STATE;
+    es_sm.matrix_state[ESC_SEQ_CSI_PREFIX_STATE]['C'] = ESC_SEQ_CSI_CUF_STATE;
+    es_sm.matrix_state[ESC_SEQ_CSI_CUF_STATE]['\e'] = ESC_SEQ_ESC_SYM_STATE;
+    es_sm.matrix_state[ESC_SEQ_CSI_CUB_STATE]['\e'] = ESC_SEQ_ESC_SYM_STATE;
+}
+
 void uart_rx(void)
 {
     int i = 0;
     int c;
-    int esc_status = 0;
+    init_esc_seq_state_machine();
     system ("/bin/stty raw");
     system("stty -echo");
     while((c=getchar())!= '.') 
     {
-        //printf(".%d.", c);
+        if (c >= 0 && c <= 127)
+            es_sm.cur_state = es_sm.matrix_state[es_sm.cur_state][c];
 
-        switch(esc_status)
+        switch(es_sm.cur_state)
         {
-            case 0:
-                switch(c)
-                {
-                    case 27: esc_status = 1; break;
-                    default: esc_status = 0; break;
-                }
+            case ESC_SEQ_OFF_STATE:
                 break;
-            case 1:
-                switch(c)
-                {
-                    case 91: esc_status = 2; break;
-                    default: esc_status = 0; break;
-                }
-                break;
-            case 2:
-                switch(c)
-                {
-                    case 'D': esc_status = 3; break;
-                    case 'C': esc_status = 4; break;
-                    default:  esc_status = 5; break;
-                }
-                break;
-            default: 
-                esc_status = 0;
-                break;
-        }
-
-        switch(esc_status)
-        {
-            case 0:
-                break;
-            case 3:
-                esc_status = 0;
+            case ESC_SEQ_CSI_CUB_STATE:
                 if (bufStruct.cur_pos > bufStruct.end)
                     continue;
                 buf_move_cur(&bufStruct, BUF_CUR_LEFT);
                 printf("\e[%dD", 1);
                 continue;
-            case 4:
-                esc_status = 0;
+            case ESC_SEQ_CSI_CUF_STATE:
                 if (bufStruct.cur_pos == 1)
                     continue;
                 buf_move_cur(&bufStruct, BUF_CUR_RIGHT);
                 printf("\e[%dC", 1);
-                continue;
-            case 5:
-                esc_status = 0;
                 continue;
             default:
                 continue;
